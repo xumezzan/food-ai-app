@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Секреты — НИКОГДА не коммитить
+.env
+
+# Загрузки
+/tmp/food_ai_uploads/
+
+# IDE
+.idea/
+.vscode/
