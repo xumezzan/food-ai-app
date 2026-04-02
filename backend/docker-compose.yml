@@ -1,6 +1,44 @@
 version: '3.8'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Production-ready docker-compose с:
+#   - Nginx Load Balancer
+#   - API (3 реплики FastAPI — автоматически балансируются)
+#   - PgBouncer (пул соединений к PostgreSQL)
+#   - PostgreSQL
+#   - Redis Cache
+#
+# Запуск: docker-compose up -d --build --scale api=3
+# ─────────────────────────────────────────────────────────────────────────────
+
 services:
+
+  # ─── 1. PgBouncer — менеджер пула соединений к PostgreSQL ─────────────────
+  pgbouncer:
+    image: bitnami/pgbouncer:1.22.1
+    restart: always
+    ports:
+      - "6432:6432"     # PgBouncer слушает на 6432 (не 5432!)
+    environment:
+      POSTGRESQL_HOST: db
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: whomaun
+      POSTGRESQL_PASSWORD: mysecretpassword
+      POSTGRESQL_DATABASE: food_ai_db
+      PGBOUNCER_PORT: 6432
+      PGBOUNCER_DATABASE: food_ai_db
+      # transaction — самый эффективный режим пула:
+      # соединение возвращается в пул СРАЗУ после транзакции
+      PGBOUNCER_POOL_MODE: transaction
+      # Максимум 100 клиентских соединений к PgBouncer
+      PGBOUNCER_MAX_CLIENT_CONN: 100
+      # Но реальных соединений к Postgres — всего 20
+      # (PostgreSQL комфортно держит 20, а не 10 000)
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+    depends_on:
+      - db
+
+  # ─── 2. PostgreSQL ─────────────────────────────────────────────────────────
   db:
     image: postgres:15-alpine
     restart: always
@@ -12,7 +50,13 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Ограничение ресурсов (не даём Postgres съесть всю память)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
 
+  # ─── 3. Redis Cache ────────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     restart: always
@@ -20,20 +64,45 @@ services:
       - "6379:6379"
     volumes:
       - redisdata:/data
+    # 256MB, LRU — автоматически удаляет старый кэш при переполнении
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
 
+  # ─── 4. FastAPI App (несколько реплик) ────────────────────────────────────
   api:
     build: .
     restart: always
-    ports:
-      - "8000:8000"
+    # НЕТ ports — трафик идёт только через Nginx (безопасно)
     environment:
-      - DATABASE_URL=postgresql://whomaun:mysecretpassword@db:5432/food_ai_db
+      # Через PgBouncer (порт 6432), не напрямую к Postgres!
+      - DATABASE_URL=postgresql://whomaun:mysecretpassword@pgbouncer:6432/food_ai_db
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - db
+      - pgbouncer
       - redis
+    # Docker Swarm: auto-scaling при высокой нагрузке
+    deploy:
+      replicas: 3             # По умолчанию 3 реплики
+      update_config:
+        parallelism: 1        # Обновляем по 1 реплике (zero-downtime deploy)
+        delay: 10s
+      restart_policy:
+        condition: on-failure
+
+  # ─── 5. Nginx Load Balancer ────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    restart: always
+    ports:
+      - "80:80"             # Весь трафик идёт сюда
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
 volumes:
   pgdata:
