@@ -135,9 +135,14 @@ async def get_ai_verdict(user_profile, product) -> AiVerdict:
     """
     Основная функция. Вызывается из роутера (async).
 
-    Если GEMINI_API_KEY не задан или произошла ошибка —
-    возвращает заглушку (is_mock=True) без падения сервера.
+    Порядок работы:
+      1. Проверяем Redis — если вердикт уже есть, отдаем его за 0.001 сек
+      2. Если нет — спрашиваем Gemini (2-3 сек)
+      3. Сохраняем результат в Redis на 24 часа
+      4. Если GEMINI_API_KEY не задан или ошибка — заглушка (is_mock=True)
     """
+    from app.services.cache import get_cached_verdict, set_cached_verdict
+
     if not settings.GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY не задан — возвращаем mock-вердикт")
         return AiVerdict(
@@ -146,11 +151,37 @@ async def get_ai_verdict(user_profile, product) -> AiVerdict:
             is_mock=True,
         )
 
+    # 1. Ищем в кэше (product.id может быть None у не сохраненных продуктов)
+    product_id = getattr(product, "id", None)
+    user_goal = str(user_profile.goal).split(".")[-1]
+
+    if product_id is not None:
+        cached = await get_cached_verdict(product_id, user_goal)
+        if cached:
+            return AiVerdict(
+                verdict=cached["verdict"],
+                explanation=cached["explanation"],
+                is_mock=False,
+            )
+
+    # 2. Кэша нет — идём в Gemini
     try:
         norms = user_profile.get_daily_norms()
         prompt = _build_prompt(user_profile, product, norms)
         raw = await _call_llm_async(prompt)
-        return _parse_response(raw)
+        result = _parse_response(raw)
+
+        # 3. Сохраняем в кэш (только реальные ответы, не заглушки)
+        if product_id is not None:
+            await set_cached_verdict(
+                product_id=product_id,
+                user_goal=user_goal,
+                verdict=result.verdict,
+                explanation=result.explanation,
+                is_mock=result.is_mock,
+            )
+
+        return result
 
     except Exception as e:
         logger.error(f"Ошибка AI-вердикта: {e}")

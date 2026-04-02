@@ -13,6 +13,15 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+
   api:
     build: .
     restart: always
@@ -21,8 +30,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://whomaun:mysecretpassword@db:5432/food_ai_db
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - db
+      - redis
 
 volumes:
   pgdata:
+  redisdata:
