@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(__file__))
 
 from app.database import SessionLocal, engine, Base
 from app.models.product import Product
-from app.models.user import User
+from app.models.user import UserProfile
 
 Base.metadata.create_all(bind=engine)
 
@@ -31,7 +31,7 @@ PRODUCTS = [
     {"name": "avocado",          "calories": 160, "protein": 2.0,  "fat": 15.0, "carbs": 9.0},
 ]
 
-TEST_USER = {"weight": 75.0, "height": 178.0, "goal": "loss"}
+TEST_USER = {"weight": 75.0, "height": 178.0, "age": 30, "gender": "male", "goal": "loss"}
 
 
 def seed():
@@ -45,9 +45,9 @@ def seed():
                 added += 1
 
         # Тестовый пользователь с id=1
-        user = db.query(User).filter(User.id == 1).first()
+        user = db.query(UserProfile).filter(UserProfile.id == 1).first()
         if not user:
-            db.add(User(**TEST_USER))
+            db.add(UserProfile(**TEST_USER))
 
         db.commit()
         print(f"✅ Добавлено продуктов: {added}")

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/product.dart';
+import '../../core/localization/language_service.dart';
 
 class ResultScreen extends StatelessWidget {
   final Product product;
@@ -17,9 +18,9 @@ class ResultScreen extends StatelessWidget {
 
   String get _verdictLabel {
     switch (product.verdict) {
-      case 'green': return '🟢 Идеально';
-      case 'red':   return '🔴 Не рекомендуется';
-      default:      return '🟡 С осторожностью';
+      case 'green': return LanguageService.t('verdict_green');
+      case 'red':   return LanguageService.t('verdict_red');
+      default:      return LanguageService.t('verdict_yellow');
     }
   }
 
@@ -29,7 +30,7 @@ class ResultScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Результат', style: TextStyle(color: Colors.black)),
+        title: Text(LanguageService.t('result'), style: const TextStyle(color: Colors.black)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
@@ -86,20 +87,20 @@ class ResultScreen extends StatelessWidget {
                 color: Color(0xFF1A1A2E),
               ),
             ),
-            const Text(
-              'ккал на 100 г',
-              style: TextStyle(fontSize: 16, color: Color(0xFF6C757D)),
+            Text(
+              LanguageService.t('kcal_per_100g'),
+              style: const TextStyle(fontSize: 16, color: Color(0xFF6C757D)),
             ),
             const SizedBox(height: 32),
 
             // БЖУ строка
             Row(
               children: [
-                _MacroChip(label: 'Белки', value: product.protein),
+                _MacroChip(label: LanguageService.t('protein'), value: product.protein),
                 const SizedBox(width: 12),
-                _MacroChip(label: 'Жиры', value: product.fat),
+                _MacroChip(label: LanguageService.t('fat'), value: product.fat),
                 const SizedBox(width: 12),
-                _MacroChip(label: 'Углеводы', value: product.carbs),
+                _MacroChip(label: LanguageService.t('carbs'), value: product.carbs),
               ],
             ),
 
@@ -134,7 +135,7 @@ class ResultScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: const Text('Сканировать ещё', style: TextStyle(fontSize: 16)),
+                child: Text(LanguageService.t('scan_more'), style: const TextStyle(fontSize: 16)),
               ),
             ),
           ],

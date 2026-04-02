@@ -3,6 +3,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../models/product.dart';
 import '../../services/api_service.dart';
 import '../../services/user_service.dart';
+import '../../core/localization/language_service.dart';
 import 'widgets/product_bottom_sheet.dart';
 
 class ScannerScreen extends StatefulWidget {
@@ -91,12 +92,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
           ),
 
           // ── Подсказка сверху ──
-          const Positioned(
+          Positioned(
             top: 60,
             left: 0,
             right: 0,
             child: Text(
-              'Наведи на штрихкод',
+              LanguageService.t('point_barcode'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white,

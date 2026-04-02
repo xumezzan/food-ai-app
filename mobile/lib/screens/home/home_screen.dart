@@ -8,7 +8,7 @@ import '../../models/product.dart';
 import '../result/result_screen.dart';
 import '../profile/profile_screen.dart';
 import '../scanner/scanner_screen.dart';
-
+import '../../core/localization/language_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,8 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (userId == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Сначала заполни профиль 👤'),
+        SnackBar(
+          content: Text(LanguageService.t('fill_profile_first')),
           backgroundColor: Colors.orange,
         ),
       );
@@ -50,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() {
       _isLoading = true;
-      _statusText = 'Распознаём еду...';
+      _statusText = LanguageService.t('recognizing');
     });
 
     try {
@@ -60,15 +60,15 @@ class _HomeScreenState extends State<HomeScreen> {
       // Предупреждение если AI работает без ключа
       if (scanResult.isMock && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('⚠️ AI-ключ не настроен — результат приблизительный'),
+          SnackBar(
+            content: Text(LanguageService.t('ai_key_missing')),
             backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
 
-      setState(() => _statusText = 'Анализируем...');
+      setState(() => _statusText = LanguageService.t('analyzing'));
 
       // Шаг 3: анализируем продукт с учётом цели
       final Product product = await ApiService.analyzeFood(scanResult.detectedName, userId);
@@ -86,7 +86,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ошибка: $e'),
+          content: Text('${LanguageService.t('error')}: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -117,14 +117,14 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'Сфотографируй еду',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+            Text(
+              LanguageService.t('take_photo'),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'и получи анализ за секунду',
-              style: TextStyle(fontSize: 15, color: Color(0xFF6C757D)),
+            Text(
+              LanguageService.t('get_analysis'),
+              style: const TextStyle(fontSize: 15, color: Color(0xFF6C757D)),
             ),
             const SizedBox(height: 48),
             ScanButton(onPressed: _onScan, isLoading: _isLoading),
@@ -137,7 +137,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (_) => const ScannerScreen()),
               ),
               icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Сканировать штрихкод'),
+              label: Text(LanguageService.t('scan_barcode')),
             ),
 
             const SizedBox(height: 24),

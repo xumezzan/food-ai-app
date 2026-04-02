@@ -3,6 +3,7 @@ import '../../../models/product.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/api_service.dart';
 import '../../../services/user_service.dart';
+import '../../../core/localization/language_service.dart';
 import 'skeleton_loader.dart';
 
 class ProductBottomSheet extends StatefulWidget {
@@ -137,9 +138,9 @@ class _ProductView extends StatelessWidget {
 
   String get _verdictLabel {
     switch (product.verdict) {
-      case 'green': return '🟢 Идеально';
-      case 'red':   return '🔴 Не рекомендуется';
-      default:      return '🟡 С осторожностью';
+      case 'green': return LanguageService.t('verdict_green');
+      case 'red':   return LanguageService.t('verdict_red');
+      default:      return LanguageService.t('verdict_yellow');
     }
   }
 
@@ -175,7 +176,7 @@ class _ProductView extends StatelessWidget {
                   color: const Color(0xFF6C757D),
                 ),
                 onPressed: onEditToggle,
-                tooltip: editMode ? 'Отмена' : 'Исправить',
+                tooltip: editMode ? LanguageService.t('cancel') : LanguageService.t('edit'),
               ),
               // Вердикт только если не редактируем
               if (!editMode && product.verdict != null)
@@ -209,18 +210,18 @@ class _ProductView extends StatelessWidget {
                 fontSize: 56, fontWeight: FontWeight.w800, height: 1,
               ),
             ),
-            const Text('ккал на 100 г',
-                style: TextStyle(fontSize: 14, color: Color(0xFF6C757D))),
+            Text(LanguageService.t('kcal_per_100g'),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF6C757D))),
             const SizedBox(height: 20),
 
             // БЖУ
             Row(
               children: [
-                _MacroChip(label: 'Белки', value: product.protein),
+                _MacroChip(label: LanguageService.t('protein'), value: product.protein),
                 const SizedBox(width: 10),
-                _MacroChip(label: 'Жиры', value: product.fat),
+                _MacroChip(label: LanguageService.t('fat'), value: product.fat),
                 const SizedBox(width: 10),
-                _MacroChip(label: 'Углеводы', value: product.carbs),
+                _MacroChip(label: LanguageService.t('carbs'), value: product.carbs),
               ],
             ),
 
@@ -287,7 +288,7 @@ class _ProductSearchFieldState extends State<_ProductSearchField> {
           controller: _controller,
           autofocus: true,
           decoration: InputDecoration(
-            hintText: 'Введи название...',
+            hintText: LanguageService.t('enter_name'),
             filled: true,
             fillColor: const Color(0xFFF8F9FA),
             suffixIcon: _searching
@@ -412,9 +413,9 @@ class _ErrorView extends StatelessWidget {
               Expanded(
                 child: editMode
                     ? _ProductSearchField(onSelected: onProductSelected)
-                    : const Text(
-                        'Продукт не найден',
-                        style: TextStyle(
+                    : Text(
+                        LanguageService.t('product_not_found'),
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
@@ -427,7 +428,7 @@ class _ErrorView extends StatelessWidget {
                   color: const Color(0xFF6C757D),
                 ),
                 onPressed: onEditToggle,
-                tooltip: editMode ? 'Отмена' : 'Добавить вручную',
+                tooltip: editMode ? LanguageService.t('cancel') : LanguageService.t('add_manually'),
               ),
             ],
           ),

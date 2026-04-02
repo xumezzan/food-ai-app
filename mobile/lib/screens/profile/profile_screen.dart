@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/user.dart';
 import '../../services/user_service.dart';
+import '../../core/localization/language_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,10 +18,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSaving = false;
   bool _isLoading = true;
 
-  final _goals = const [
-    {'value': 'loss', 'label': 'Похудение', 'icon': '📉'},
-    {'value': 'gain', 'label': 'Набор массы', 'icon': '💪'},
-    {'value': 'maintain', 'label': 'Поддержание', 'icon': '⚖️'},
+  List<Map<String, String>> get _goals => [
+    {'value': 'loss', 'label': LanguageService.t('loss'), 'icon': '📉'},
+    {'value': 'gain', 'label': LanguageService.t('gain'), 'icon': '💪'},
+    {'value': 'maintain', 'label': LanguageService.t('maintain'), 'icon': '⚖️'},
   ];
 
   @override
@@ -45,7 +46,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     if (weight == null || height == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Введи корректные вес и рост')),
+        SnackBar(content: Text(LanguageService.t('enter_valid_data'))),
       );
       return;
     }
@@ -58,8 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Профиль сохранён ✅'),
+        SnackBar(
+          content: Text(LanguageService.t('profile_saved')),
           backgroundColor: AppTheme.primary,
         ),
       );
@@ -67,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('${LanguageService.t('error')}: $e'), backgroundColor: Colors.red),
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -88,26 +89,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Мой профиль')),
+      appBar: AppBar(
+        title: Text(LanguageService.t('profile_title')),
+        actions: [
+          Row(
+            children: [
+              const Text('RU', style: TextStyle(fontSize: 14)),
+              Switch(
+                value: LanguageService.currentLanguage == 'uz',
+                onChanged: (value) async {
+                  await LanguageService.changeLanguage(value ? 'uz' : 'ru');
+                  setState(() {});
+                },
+              ),
+              const Text('UZ', style: TextStyle(fontSize: 14)),
+              const SizedBox(width: 16),
+            ],
+          )
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Вес
-            _label('Вес (кг)'),
+            _label(LanguageService.t('weight_kg')),
             const SizedBox(height: 8),
             _inputField(controller: _weightController, hint: '70'),
             const SizedBox(height: 20),
 
             // Рост
-            _label('Рост (см)'),
+            _label(LanguageService.t('height_cm')),
             const SizedBox(height: 8),
             _inputField(controller: _heightController, hint: '175'),
             const SizedBox(height: 28),
 
             // Цель
-            _label('Цель'),
+            _label(LanguageService.t('goal')),
             const SizedBox(height: 12),
             ..._goals.map((g) => _GoalTile(
                   icon: g['icon']!,
@@ -132,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text('Сохранить'),
+                    : Text(LanguageService.t('save')),
               ),
             ),
           ],
