@@ -1,11 +1,9 @@
 import asyncio
-from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from typing import Optional
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request
 
 from app.schemas.scan import ScanResponse
 from app.services.vision import recognize_food_from_bytes
-from app.services.auth import AuthUser, get_current_user
-from app.services.rate_limiter import check_and_increment_scan_limit
+from app.services.rate_limiter import check_ip_scan_limit
 
 router = APIRouter()
 
@@ -14,14 +12,14 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 @router.post("/scan", response_model=ScanResponse)
 async def scan_food(
+    request: Request,
     file: UploadFile = File(...),
-    current_user: AuthUser = Depends(get_current_user),
 ):
     """
     Принимает фото еды → Gemini Vision → возвращает название продукта.
 
-    🔒 Требует авторизацию: Authorization: Bearer <firebase_token>
-    ⏱️  Rate limit: 50 сканирований/день (Free) | без лимита (Premium)
+    ⏱️  Rate limit: 50 сканирований/день с одного IP (без авторизации).
+    🔮 После добавления Firebase Auth — лимит привяжется к пользователю.
     """
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(
@@ -29,12 +27,9 @@ async def scan_food(
             detail="Неподдерживаемый формат. Разрешены: JPEG, PNG, WebP"
         )
 
-    # Проверяем лимит ПЕРЕД обращением к ИИ (экономим токены Gemini)
-    if current_user.db_user_id is not None:
-        await check_and_increment_scan_limit(
-            user_id=current_user.db_user_id,
-            is_premium=current_user.is_premium,
-        )
+    # Rate limit по IP-адресу
+    client_ip = request.client.host if request.client else "unknown"
+    await check_ip_scan_limit(client_ip)
 
     contents = await file.read()
     result = await asyncio.to_thread(

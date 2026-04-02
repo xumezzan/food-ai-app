@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../core/constants/api_constants.dart';
 import '../models/product.dart';
-import 'auth_service.dart';
 
 /// Результат сканирования — имя продукта + флаг заглушки
 class ScanResult {
@@ -21,30 +20,17 @@ class ApiService {
   static List<dynamic> _decodeList(http.Response r) =>
       jsonDecode(utf8.decode(r.bodyBytes));
 
-  // ─── Auth заголовки ──────────────────────────────────────────────────────
-
-  /// Возвращает заголовки с Firebase ID Token.
-  /// Вызывается перед каждым запросом — Firebase обновляет токен автоматически.
-  static Future<Map<String, String>> _authHeaders({bool isJson = false}) async {
-    final token = await AuthService.getIdToken();
-    return {
-      if (isJson) 'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
+  // Базовые JSON-заголовки (без авторизации — MVP mode)
+  static const Map<String, String> _jsonHeaders = {
+    'Content-Type': 'application/json',
+  };
 
   // ─── Scan ────────────────────────────────────────────────────────────────
 
-  /// Отправляет фото → Gemini Vision → возвращает ScanResult
-  /// Требует авторизацию. Учитывает лимит 50 сканов/день.
+  /// Отправляет фото → Gemini Vision → возвращает ScanResult.
+  /// Лимит: 50 сканирований в день с одного IP.
   static Future<ScanResult> scanFood(File imageFile) async {
-    final token = await AuthService.getIdToken();
     final request = http.MultipartRequest('POST', Uri.parse(ApiConstants.scan));
-
-    if (token != null) {
-      request.headers['Authorization'] = 'Bearer $token';
-    }
-
     request.files.add(
       await http.MultipartFile.fromPath('file', imageFile.path),
     );
@@ -62,17 +48,7 @@ class ApiService {
 
     // 429 — превышен лимит сканирований
     if (response.statusCode == 429) {
-      final data = _decode(response);
-      final detail = data['detail'] as Map<String, dynamic>?;
-      throw RateLimitException(
-        message: detail?['message'] ?? 'Лимит сканирований исчерпан',
-        count: detail?['count'] as int? ?? 50,
-        limit: detail?['limit'] as int? ?? 50,
-      );
-    }
-
-    if (response.statusCode == 401) {
-      throw const UnauthorizedException();
+      throw const RateLimitException();
     }
 
     throw Exception('Ошибка распознавания: ${response.statusCode}');
@@ -83,7 +59,7 @@ class ApiService {
   static Future<Product> analyzeFood(String name, int userId) async {
     final response = await http.post(
       Uri.parse(ApiConstants.analyze),
-      headers: await _authHeaders(isJson: true),
+      headers: _jsonHeaders,
       body: jsonEncode({'name': name, 'user_id': userId}),
     );
     if (response.statusCode == 200) {
@@ -101,7 +77,7 @@ class ApiService {
         if (userId != null) 'user_id': userId.toString(),
       },
     );
-    final response = await http.get(uri, headers: await _authHeaders());
+    final response = await http.get(uri);
     if (response.statusCode == 200) {
       return Product.fromJson(_decode(response));
     } else if (response.statusCode == 404) {
@@ -116,7 +92,7 @@ class ApiService {
     if (query.length < 2) return [];
     final uri = Uri.parse(ApiConstants.productSearch)
         .replace(queryParameters: {'q': query});
-    final response = await http.get(uri, headers: await _authHeaders());
+    final response = await http.get(uri);
     if (response.statusCode == 200) {
       return _decodeList(response).map((j) => Product.fromJson(j)).toList();
     }
@@ -132,7 +108,7 @@ class ApiService {
   }) async {
     final response = await http.post(
       Uri.parse(ApiConstants.correctProduct),
-      headers: await _authHeaders(isJson: true),
+      headers: _jsonHeaders,
       body: jsonEncode({
         'barcode': barcode,
         'product_id': productId,
@@ -144,20 +120,6 @@ class ApiService {
     }
     throw Exception('Ошибка исправления: ${response.statusCode}');
   }
-
-  // ─── Auth Usage ──────────────────────────────────────────────────────────
-
-  /// Возвращает статус лимита сканирований для отображения в UI.
-  static Future<Map<String, dynamic>> getScanUsage() async {
-    final response = await http.get(
-      Uri.parse('${ApiConstants.baseUrl}/auth/usage'),
-      headers: await _authHeaders(),
-    );
-    if (response.statusCode == 200) {
-      return _decode(response);
-    }
-    return {'count': 0, 'limit': 50, 'remaining': 50};
-  }
 }
 
 // ─────────────────────────────────────────────
@@ -165,23 +127,9 @@ class ApiService {
 // ─────────────────────────────────────────────
 
 class RateLimitException implements Exception {
-  final String message;
-  final int count;
-  final int limit;
-
-  const RateLimitException({
-    required this.message,
-    required this.count,
-    required this.limit,
-  });
+  const RateLimitException();
 
   @override
-  String toString() => message;
-}
-
-class UnauthorizedException implements Exception {
-  const UnauthorizedException();
-
-  @override
-  String toString() => 'Необходима авторизация. Войдите в приложение.';
+  String toString() =>
+      'Лимит 50 сканирований в день исчерпан. Попробуйте завтра.';
 }

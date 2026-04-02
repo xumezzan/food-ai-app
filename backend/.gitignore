@@ -7,6 +7,8 @@ venv/
 
 # Секреты — НИКОГДА не коммитить
 .env
+firebase-key.json
+*-service-account*.json
 
 # Загрузки
 /tmp/food_ai_uploads/

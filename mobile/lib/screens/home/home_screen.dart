@@ -82,6 +82,15 @@ class _HomeScreenState extends State<HomeScreen> {
           builder: (_) => ResultScreen(product: product),
         ),
       );
+    } on RateLimitException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ $e'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 5),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

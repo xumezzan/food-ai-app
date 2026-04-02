@@ -27,16 +27,17 @@ logger = logging.getLogger(__name__)
 
 # Лимиты
 FREE_DAILY_LIMIT = 50
-PREMIUM_DAILY_LIMIT = 999_999  # Фактически без ограничений
+PREMIUM_DAILY_LIMIT = 999_999
 
 
 def _today_key(user_id: int) -> str:
-    """
-    Формирует ключ Redis для сегодняшнего дня.
-    Пример: "scan_limit:42:2024-01-15"
-    """
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return f"scan_limit:{user_id}:{today}"
+
+
+def _ip_today_key(ip: str) -> str:
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return f"scan_limit:ip:{ip}:{today}"
 
 
 def _seconds_until_midnight() -> int:
@@ -137,3 +138,37 @@ async def get_scan_usage(user_id: int, is_premium: bool = False) -> dict:
     except Exception as e:
         logger.error(f"Ошибка чтения rate limit: {e}")
         return {"count": 0, "limit": limit, "remaining": limit}
+
+
+async def check_ip_scan_limit(ip: str) -> None:
+    """
+    Rate limit по IP-адресу — для работы без авторизации (MVP mode).
+    50 сканирований в день с одного IP. Сбрасывается в полночь.
+    Если Redis недоступен — пропускает без блокировки.
+    """
+    redis = await get_redis()
+    if redis is None:
+        return  # graceful degradation
+
+    key = _ip_today_key(ip)
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, _seconds_until_midnight())
+
+        if count > FREE_DAILY_LIMIT:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "error": "daily_limit_exceeded",
+                    "message": f"Лимит {FREE_DAILY_LIMIT} сканирований в день исчерпан. Попробуйте завтра.",
+                    "count": count,
+                    "limit": FREE_DAILY_LIMIT,
+                },
+                headers={"Retry-After": str(_seconds_until_midnight())},
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Ошибка IP rate limit для {ip}: {e}")
+
