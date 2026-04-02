@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from pydantic import BaseModel
 
 from app.database import get_db
@@ -17,22 +18,24 @@ class DailyNormsResponse(BaseModel):
 
 
 @router.post("/user", response_model=UserResponse, status_code=201)
-def create_user(data: UserCreate, db: Session = Depends(get_db)):
+async def create_user(data: UserCreate, db: AsyncSession = Depends(get_db)):
     """Создаёт профиль пользователя. Возвращает id."""
     user = UserProfile(**data.model_dump())
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    await db.commit()
+    await db.refresh(user)
     return user
 
 
 @router.get("/user/{user_id}/norms", response_model=DailyNormsResponse)
-def get_user_norms(user_id: int, db: Session = Depends(get_db)):
+async def get_user_norms(user_id: int, db: AsyncSession = Depends(get_db)):
     """
     Возвращает суточную норму калорий и БЖУ для пользователя.
     Пример: GET /user/1/norms
     """
-    user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
+    result = await db.execute(select(UserProfile).where(UserProfile.id == user_id))
+    user = result.scalar_one_or_none()
+
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 

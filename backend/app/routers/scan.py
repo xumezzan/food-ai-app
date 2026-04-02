@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from app.schemas.scan import ScanResponse
@@ -21,7 +22,8 @@ async def scan_food(file: UploadFile = File(...)):
         )
 
     contents = await file.read()
-    result = recognize_food_from_bytes(
+    result = await asyncio.to_thread(
+        recognize_food_from_bytes,
         image_bytes=contents,
         mime_type=file.content_type or "image/jpeg",
     )

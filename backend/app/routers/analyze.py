@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database import get_db
 from app.models.product import Product
@@ -11,16 +12,23 @@ router = APIRouter()
 
 
 @router.post("/analyze", response_model=AnalyzeResponse)
-def analyze(data: AnalyzeRequest, db: Session = Depends(get_db)):
+async def analyze(data: AnalyzeRequest, db: AsyncSession = Depends(get_db)):
     """
     Анализирует продукт с учётом цели пользователя.
     Использует Gemini AI (единый советник для всего приложения).
     """
-    user = db.query(UserProfile).filter(UserProfile.id == data.user_id).first()
+    # Async поиск пользователя
+    user_result = await db.execute(select(UserProfile).where(UserProfile.id == data.user_id))
+    user = user_result.scalar_one_or_none()
+
     if not user:
         raise HTTPException(status_code=404, detail="Пользователь не найден")
 
-    product = db.query(Product).filter(Product.name.ilike(data.name)).first()
+    # Async поиск продукта по имени (ilike)
+    product_result = await db.execute(
+        select(Product).where(Product.name.ilike(data.name))
+    )
+    product = product_result.scalar_one_or_none()
 
     if not product:
         return AnalyzeResponse(
@@ -31,7 +39,8 @@ def analyze(data: AnalyzeRequest, db: Session = Depends(get_db)):
             verdict_is_mock=True
         )
 
-    verdict = get_ai_verdict(user, product)
+    # Async вердикт от AI
+    verdict = await get_ai_verdict(user, product)
 
     return AnalyzeResponse(
         name=product.name,
@@ -43,4 +52,3 @@ def analyze(data: AnalyzeRequest, db: Session = Depends(get_db)):
         verdict_text=verdict.explanation,
         verdict_is_mock=verdict.is_mock,
     )
-
