@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Enum
+from sqlalchemy import Column, Integer, Float, String, Enum, Boolean
 from sqlalchemy.orm import relationship
 import enum
 
@@ -28,6 +28,13 @@ class UserProfile(Base):
     __tablename__ = "user_profiles"
 
     id: int = Column(Integer, primary_key=True, index=True)
+
+    # ── Firebase Auth (Google / Apple Sign-In) ─────────────────────────────
+    firebase_uid: str = Column(String(128), unique=True, nullable=True, index=True)
+    email: str = Column(String(256), nullable=True)
+    is_premium: bool = Column(Boolean, default=False, nullable=False)
+
+    # ── Физические параметры ───────────────────────────────────────────────
     height: float = Column(Float, nullable=False)
     weight: float = Column(Float, nullable=False)
     age: int = Column(Integer, nullable=False)
